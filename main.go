@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
@@ -11,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/user"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -68,6 +68,18 @@ func main() {
 	if err != nil {
 		fmt.Println("Error setting wallpaper:", err)
 		return
+	}
+	// 删除壁纸文件
+	err = os.Remove(image)
+	if err != nil {
+		// 如果发生错误，打印出来
+		fmt.Println("删除壁纸文件错误:", err)
+	}
+	ts := flag.Bool("ts", false, "设置Windows任务计划，可在taskschd.msc中查看")
+	flag.Parse()
+	if *ts {
+		// 创建任务计划
+		createSchedule()
 	}
 }
 
@@ -354,7 +366,8 @@ func addToStartup(appName, appPath string) error {
 }
 
 // 创建任务计划: https://docs.microsoft.com/zh-cn/windows/win32/taskschd/task-scheduler-start-page
-// 解锁、启动、登录等事件触发任务计划
+// see https://github.com/capnspacehook/taskmaster/blob/master/manage.go
+// 解锁、启动、登录等事件触发任务计划 taskschd.msc
 func createSchedule() {
 	sysType := runtime.GOOS
 	if sysType == "windows" {
@@ -400,16 +413,196 @@ func createSchedule() {
 			println(name.ToString())
 			return nil
 		})
-		println(os.Hostname())
-		currentUser, err := user.Current()
-		if err != nil {
-			return
-		}
-		println(strings.Split(currentUser.Username, `\`)[1])
+		// https://github.com/capnspacehook/taskmaster/blob/master/fill.go
+		task_definition := oleutil.MustCallMethod(folder.ToIDispatch(), "NewTask", 0).ToIDispatch()
+		defer task_definition.Release()
+		triggers := oleutil.MustGetProperty(task_definition, "Triggers").ToIDispatch()
+		defer triggers.Release()
+		registration_info := oleutil.MustGetProperty(task_definition, "RegistrationInfo").ToIDispatch()
+		defer registration_info.Release()
+		actions := oleutil.MustGetProperty(task_definition, "Actions").ToIDispatch()
+		defer actions.Release()
+		principal := oleutil.MustGetProperty(task_definition, "Principal").ToIDispatch()
+		defer principal.Release()
+		settings := oleutil.MustGetProperty(task_definition, "Settings").ToIDispatch()
+		defer settings.Release()
+
+		/*repetition := oleutil.MustGetProperty(triggers, "Repetition").ToIDispatch()
+		  defer repetition.Release()
+		  oleutil.MustPutProperty(repetition, "Duration", "")
+		  oleutil.MustPutProperty(repetition, "Interval", "")
+		  oleutil.MustPutProperty(repetition, "StopAtDurationEnd", true)*/
+
+		/*//trigger0 := triggers.MustQueryInterface(ole.NewGUID("{d45b0167-9653-4eef-b94f-0732ca7af251}"))
+		        trigger0 := oleutil.MustCallMethod(triggers, "Create", uint(0)).ToIDispatch()
+		        defer trigger0.Release()
+		        oleutil.MustPutProperty(trigger0, "Id", "")
+		        oleutil.MustPutProperty(trigger0, "Enabled", true)
+		        //oleutil.MustPutProperty(trigger0, "EndBoundary", "")
+		        //oleutil.MustPutProperty(trigger0, "ExecutionTimeLimit", "")
+		        oleutil.MustPutProperty(trigger0, "Id", "")
+		        oleutil.MustPutProperty(trigger0, "Subscription", `<QueryList>
+		    <Query Id='0'>
+		        <Select Path='System'>
+		            *[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1]]
+		        </Select>
+		    </Query>
+		    <Query Id='1'>
+		        <Select Path='System'>
+		            *[System/Level=2]
+		        </Select>
+		    </Query>
+		</QueryList>`)*/
+
+		/*//trigger1 := triggers.MustQueryInterface(ole.NewGUID("{b45747e0-eba7-4276-9f29-85c5bb300006}"))
+		  trigger1 := oleutil.MustCallMethod(triggers, "Create", uint(1)).ToIDispatch()
+		  defer trigger1.Release()
+		    oleutil.MustPutProperty(trigger1, "Id", "bing_wallpaper_time_trigger")
+		    oleutil.MustPutProperty(trigger1, "Enabled", true)*/
+
+		/*//trigger2 := triggers.MustQueryInterface(ole.NewGUID("{126c5cd8-b288-41d5-8dbf-e491446adc5c}"))
+		  trigger2 := oleutil.MustCallMethod(triggers, "Create", uint(2)).ToIDispatch()
+		  defer trigger2.Release()
+		  oleutil.MustPutProperty(trigger2, "Id", "bing_wallpaper_daily_trigger")
+		  oleutil.MustPutProperty(trigger2, "Enabled", true)
+		  oleutil.MustPutProperty(trigger2, "DaysInterval", 1)*/
+
+		/*//trigger3 := triggers.MustQueryInterface(ole.NewGUID("{5038fc98-82ff-436d-8728-a512a57c9dc1}"))
+		  trigger3 := oleutil.MustCallMethod(triggers, "Create", uint(3)).ToIDispatch()
+		  defer trigger3.Release()
+		  oleutil.MustPutProperty(trigger3, "Id", "bing_wallpaper_weekly_trigger")
+		  oleutil.MustPutProperty(trigger3, "Enabled", true)*/
+
+		/*//trigger4 := triggers.MustQueryInterface(ole.NewGUID("{97c45ef1-6b02-4a1a-9c0e-1ebfba1500ac}"))
+		  trigger4 := oleutil.MustCallMethod(triggers, "Create", uint(4)).ToIDispatch()
+		  defer trigger4.Release()
+		  oleutil.MustPutProperty(trigger4, "Id", "bing_wallpaper_monthly_trigger")
+		  oleutil.MustPutProperty(trigger4, "Enabled", true)*/
+
+		/*//trigger5 := triggers.MustQueryInterface(ole.NewGUID("{77d025a3-90fa-43aa-b52e-cda5499b946a}"))
+		  trigger5 := oleutil.MustCallMethod(triggers, "Create", uint(5)).ToIDispatch()
+		  defer trigger5.Release()
+		  oleutil.MustPutProperty(trigger5, "Id", "bing_wallpaper_monthlydow_trigger")
+		  oleutil.MustPutProperty(trigger5, "Enabled", true)*/
+
+		// 创建闲置触发，在发生空闲情况时启动任务的触发器
+		/*//trigger6 := triggers.MustQueryInterface(ole.NewGUID("{d537d2b0-9fb3-4d34-9739-1ff5ce7b1ef3}"))
+		  trigger6 := oleutil.MustCallMethod(triggers, "Create", uint(6)).ToIDispatch()
+		  defer trigger6.Release()
+		  oleutil.MustPutProperty(trigger6, "Id", "bing_wallpaper_idle_trigger")
+		  oleutil.MustPutProperty(trigger6, "Enabled", true)*/
+
+		// 创建注册触发器
+		//trigger7 := triggers.MustQueryInterface(ole.NewGUID("{4c8fec3a-c218-4e0c-b23d-629024db91a2}"))
+		trigger7 := oleutil.MustCallMethod(triggers, "Create", uint(7)).ToIDispatch()
+		defer trigger7.Release()
+		oleutil.MustPutProperty(trigger7, "Id", "bing_wallpaper_registration_trigger")
+		oleutil.MustPutProperty(trigger7, "Enabled", true)
+
+		// 创建启动触发器
+		//trigger8 := triggers.MustQueryInterface(ole.NewGUID("{2a9c35da-d357-41f4-bbc1-207ac1b1f3cb}"))
+		trigger8 := oleutil.MustCallMethod(triggers, "Create", uint(8)).ToIDispatch()
+		defer trigger8.Release()
+		oleutil.MustPutProperty(trigger8, "Id", "bing_wallpaper_boot_trigger")
+		oleutil.MustPutProperty(trigger8, "Enabled", true)
+
+		// 创建登录触发器
+		//trigger9 := triggers.MustQueryInterface(ole.NewGUID("{72dade38-fae4-4b3e-baf4-5d009af02b1c}"))
+		trigger9 := oleutil.MustCallMethod(triggers, "Create", uint(9)).ToIDispatch()
+		defer trigger9.Release()
+		oleutil.MustPutProperty(trigger9, "Id", "bing_wallpaper_logon_trigger")
+		oleutil.MustPutProperty(trigger9, "Enabled", true)
+
+		// 用于触发控制台连接或断开连接，远程连接或断开连接或工作站锁定或解锁通知的任务。
+		//trigger11 := triggers.MustQueryInterface(ole.NewGUID("{754da71b-4385-4475-9dd9-598294fa3641}"))
+		trigger11 := oleutil.MustCallMethod(triggers, "Create", uint(11)).ToIDispatch()
+		defer trigger11.Release()
+		oleutil.MustPutProperty(trigger11, "Id", "bing_wallpaper_ssc_trigger")
+		oleutil.MustPutProperty(trigger11, "Enabled", true)
+		// 获取或设置将触发任务启动的终端服务器会话更改的类型：7锁定；8解锁
+		oleutil.MustPutProperty(trigger11, "StateChange", uint(8))
+
+		// 自定义
+		/*trigger12 := oleutil.MustCallMethod(triggers, "Create", uint(12)).ToIDispatch()
+		  defer trigger12.Release()
+		  oleutil.MustPutProperty(trigger12, "Id", "")
+		  oleutil.MustPutProperty(trigger12, "Enabled", true)*/
+
+		// 设置任务的注册信息
+		oleutil.MustGetProperty(registration_info, "Author", "bajins")
+		//oleutil.MustPutProperty(registration_info, "Date", "")
+		oleutil.MustGetProperty(registration_info, "Description", "设置Bing桌面壁纸")
+		//oleutil.MustPutProperty(registration_info, "Documentation", "")
+		//oleutil.MustPutProperty(registration_info, "SecurityDescriptor", "")
+		//oleutil.MustPutProperty(registration_info, "Source", "")
+		//oleutil.MustPutProperty(registration_info, "URI", "")
+		//oleutil.MustPutProperty(registration_info, "Version", "")
+
+		// 创建任务的操作
+		var context string
+		oleutil.MustPutProperty(actions, "Context", context)
+		//action := actions.MustQueryInterface(ole.NewGUID("{4c3d624d-fd6b-49a3-b9b7-09cb3cd3f047}"))
+		action := oleutil.MustCallMethod(actions, "Create", uint(ole.TKIND_DISPATCH)).ToIDispatch()
+		defer action.Release()
+		oleutil.MustPutProperty(action, "Id", "set_bing_wallpaper")
+		// os.Hostname()
+		/*currentUser, err := user.Current()
+		  if err != nil {
+		      return
+		  }
+		  fmt.Println(strings.Split(currentUser.Username, `\`)[1])*/
 		path, _ := os.Executable()
 		_, exec := filepath.Split(path)
-		println(exec)
+		oleutil.MustPutProperty(action, "Path", exec)
+		oleutil.MustPutProperty(action, "WorkingDirectory", "")
+		oleutil.MustPutProperty(action, "Arguments", "")
+
+		//
+		//oleutil.MustPutProperty(principal, "DisplayName", "")
+		//oleutil.MustPutProperty(principal, "GroupId", "")
+		//oleutil.MustPutProperty(principal, "Id", "")
+		oleutil.MustPutProperty(principal, "LogonType", uint(3))
+		oleutil.MustPutProperty(principal, "RunLevel", uint(1))
+		//oleutil.MustPutProperty(principal, "UserId", "")
+
+		//
+		oleutil.MustPutProperty(settings, "Enabled", true)
+		oleutil.MustPutProperty(settings, "Hidden", true)
+		oleutil.MustPutProperty(settings, "RunOnlyIfIdle", false)
+		//oleutil.MustPutProperty(settings, "AllowDemandStart", false)
+		//oleutil.MustPutProperty(settings, "AllowHardTerminate", false)
+		//oleutil.MustPutProperty(settings, "Compatibility", uint(0))
+		//oleutil.MustPutProperty(settings, "DeleteExpiredTaskAfter", false)
+		//oleutil.MustPutProperty(settings, "DisallowStartIfOnBatteries", false)
+		//oleutil.MustPutProperty(settings, "ExecutionTimeLimit", "")
+
+		/*idlesettingsObj := oleutil.MustGetProperty(settings, "IdleSettings").ToIDispatch()
+		  defer idlesettingsObj.Release()
+		  oleutil.MustPutProperty(idlesettingsObj, "IdleDuration", "")
+		  oleutil.MustPutProperty(idlesettingsObj, "RestartOnIdle", true)
+		  oleutil.MustPutProperty(idlesettingsObj, "StopOnIdleEnd", true)
+		  oleutil.MustPutProperty(idlesettingsObj, "WaitTimeout", "")*/
+
+		//oleutil.MustPutProperty(settings, "MultipleInstances", uint(0))
+
+		/*networksettingsObj := oleutil.MustGetProperty(settings, "NetworkSettings").ToIDispatch()
+		  defer networksettingsObj.Release()
+		  oleutil.MustPutProperty(networksettingsObj, "Id", "")
+		  oleutil.MustPutProperty(networksettingsObj, "Name", "")*/
+
+		//oleutil.MustPutProperty(settings, "Priority", uint(0))
+		//oleutil.MustPutProperty(settings, "RestartCount", uint(0))
+		//oleutil.MustPutProperty(settings, "RestartInterval", "")
+		//oleutil.MustPutProperty(settings, "RunOnlyIfIdle", true)
+		//oleutil.MustPutProperty(settings, "RunOnlyIfNetworkAvailable", true)
+		//oleutil.MustPutProperty(settings, "StartWhenAvailable", true)
+		//oleutil.MustPutProperty(settings, "StopIfGoingOnBatteries", true)
+		//oleutil.MustPutProperty(settings, "WakeToRun", true)
+
+		// 设置任务的注册信息
+		oleutil.MustCallMethod(folder.ToIDispatch(), "RegisterTaskDefinition", "SetBingWallpaper", task_definition,
+			6, nil, nil, 3)
 	} else {
-		println("111")
+		fmt.Println("111")
 	}
 }
