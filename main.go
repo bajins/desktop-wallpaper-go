@@ -371,23 +371,24 @@ func addToStartup(appName, appPath string) error {
 func createSchedule() {
 	sysType := runtime.GOOS
 	if sysType == "windows" {
+		// 初始化COM库
 		err := ole.CoInitialize(0)
 		if err != nil {
 			return
 		}
 		defer ole.CoUninitialize()
-
+		// 获取任务计划对象
 		unknown, _ := oleutil.CreateObject("Schedule.Service")
 		defer unknown.Release()
-
+		// 转换为IDispatch接口
 		scheduler, _ := unknown.QueryInterface(ole.IID_IDispatch)
 		defer scheduler.Release()
-
+		// 连接到任务计划服务
 		_, err = oleutil.CallMethod(scheduler, "Connect")
 		if err != nil {
 			return
 		}
-
+		// 获取任务计划根目录
 		folder, _ := oleutil.CallMethod(scheduler, "GetFolder", "\\")
 		defer func(folder *ole.VARIANT) {
 			err := folder.Clear()
@@ -395,7 +396,7 @@ func createSchedule() {
 
 			}
 		}(folder)
-
+		// 获取任务计划列表
 		tasks, _ := oleutil.CallMethod(folder.ToIDispatch(), "GetTasks", 1)
 		defer func(tasks *ole.VARIANT) {
 			err := tasks.Clear()
@@ -403,6 +404,7 @@ func createSchedule() {
 
 			}
 		}(tasks)
+		// 遍历任务计划列表
 		err = oleutil.ForEach(tasks.ToIDispatch(), func(v *ole.VARIANT) error {
 			task := v.ToIDispatch()
 			//name := oleutil.MustGetProperty(task, "Name").ToString()
@@ -413,6 +415,7 @@ func createSchedule() {
 			println(name.ToString())
 			return nil
 		})
+		// 创建任务计划
 		// https://github.com/capnspacehook/taskmaster/blob/master/fill.go
 		task_definition := oleutil.MustCallMethod(folder.ToIDispatch(), "NewTask", 0).ToIDispatch()
 		defer task_definition.Release()
@@ -433,10 +436,11 @@ func createSchedule() {
 		  oleutil.MustPutProperty(repetition, "Interval", "")
 		  oleutil.MustPutProperty(repetition, "StopAtDurationEnd", true)*/
 
-		/*//trigger0 := triggers.MustQueryInterface(ole.NewGUID("{d45b0167-9653-4eef-b94f-0732ca7af251}"))
-		        trigger0 := oleutil.MustCallMethod(triggers, "Create", uint(0)).ToIDispatch()
+		// 创建事件触发器
+		//trigger0 := triggers.MustQueryInterface(ole.NewGUID("{d45b0167-9653-4eef-b94f-0732ca7af251}"))
+		/*trigger0 := oleutil.MustCallMethod(triggers, "Create", uint(0)).ToIDispatch()
 		        defer trigger0.Release()
-		        oleutil.MustPutProperty(trigger0, "Id", "")
+		        oleutil.MustPutProperty(trigger0, "Id", "bing_wallpaper_event_trigger")
 		        oleutil.MustPutProperty(trigger0, "Enabled", true)
 		        //oleutil.MustPutProperty(trigger0, "EndBoundary", "")
 		        //oleutil.MustPutProperty(trigger0, "ExecutionTimeLimit", "")
@@ -454,50 +458,55 @@ func createSchedule() {
 		    </Query>
 		</QueryList>`)*/
 
-		/*//trigger1 := triggers.MustQueryInterface(ole.NewGUID("{b45747e0-eba7-4276-9f29-85c5bb300006}"))
-		  trigger1 := oleutil.MustCallMethod(triggers, "Create", uint(1)).ToIDispatch()
+		// 创建定时触发器
+		//trigger1 := triggers.MustQueryInterface(ole.NewGUID("{b45747e0-eba7-4276-9f29-85c5bb300006}"))
+		/*trigger1 := oleutil.MustCallMethod(triggers, "Create", uint(1)).ToIDispatch()
 		  defer trigger1.Release()
-		    oleutil.MustPutProperty(trigger1, "Id", "bing_wallpaper_time_trigger")
-		    oleutil.MustPutProperty(trigger1, "Enabled", true)*/
+		  oleutil.MustPutProperty(trigger1, "Id", "bing_wallpaper_time_trigger")
+		  oleutil.MustPutProperty(trigger1, "Enabled", true)*/
 
-		/*//trigger2 := triggers.MustQueryInterface(ole.NewGUID("{126c5cd8-b288-41d5-8dbf-e491446adc5c}"))
-		  trigger2 := oleutil.MustCallMethod(triggers, "Create", uint(2)).ToIDispatch()
+		// 创建每日触发器
+		//trigger2 := triggers.MustQueryInterface(ole.NewGUID("{126c5cd8-b288-41d5-8dbf-e491446adc5c}"))
+		/*trigger2 := oleutil.MustCallMethod(triggers, "Create", uint(2)).ToIDispatch()
 		  defer trigger2.Release()
 		  oleutil.MustPutProperty(trigger2, "Id", "bing_wallpaper_daily_trigger")
 		  oleutil.MustPutProperty(trigger2, "Enabled", true)
 		  oleutil.MustPutProperty(trigger2, "DaysInterval", 1)*/
 
-		/*//trigger3 := triggers.MustQueryInterface(ole.NewGUID("{5038fc98-82ff-436d-8728-a512a57c9dc1}"))
-		  trigger3 := oleutil.MustCallMethod(triggers, "Create", uint(3)).ToIDispatch()
+		// 创建每周触发器
+		//trigger3 := triggers.MustQueryInterface(ole.NewGUID("{5038fc98-82ff-436d-8728-a512a57c9dc1}"))
+		/*trigger3 := oleutil.MustCallMethod(triggers, "Create", uint(3)).ToIDispatch()
 		  defer trigger3.Release()
 		  oleutil.MustPutProperty(trigger3, "Id", "bing_wallpaper_weekly_trigger")
 		  oleutil.MustPutProperty(trigger3, "Enabled", true)*/
 
-		/*//trigger4 := triggers.MustQueryInterface(ole.NewGUID("{97c45ef1-6b02-4a1a-9c0e-1ebfba1500ac}"))
-		  trigger4 := oleutil.MustCallMethod(triggers, "Create", uint(4)).ToIDispatch()
+		// 创建每月的第几天触发器
+		//trigger4 := triggers.MustQueryInterface(ole.NewGUID("{97c45ef1-6b02-4a1a-9c0e-1ebfba1500ac}"))
+		/*trigger4 := oleutil.MustCallMethod(triggers, "Create", uint(4)).ToIDispatch()
 		  defer trigger4.Release()
 		  oleutil.MustPutProperty(trigger4, "Id", "bing_wallpaper_monthly_trigger")
 		  oleutil.MustPutProperty(trigger4, "Enabled", true)*/
 
-		/*//trigger5 := triggers.MustQueryInterface(ole.NewGUID("{77d025a3-90fa-43aa-b52e-cda5499b946a}"))
-		  trigger5 := oleutil.MustCallMethod(triggers, "Create", uint(5)).ToIDispatch()
+		// 创建每月的第几个星期几触发器
+		//trigger5 := triggers.MustQueryInterface(ole.NewGUID("{77d025a3-90fa-43aa-b52e-cda5499b946a}"))
+		/*trigger5 := oleutil.MustCallMethod(triggers, "Create", uint(5)).ToIDispatch()
 		  defer trigger5.Release()
 		  oleutil.MustPutProperty(trigger5, "Id", "bing_wallpaper_monthlydow_trigger")
 		  oleutil.MustPutProperty(trigger5, "Enabled", true)*/
 
 		// 创建闲置触发，在发生空闲情况时启动任务的触发器
-		/*//trigger6 := triggers.MustQueryInterface(ole.NewGUID("{d537d2b0-9fb3-4d34-9739-1ff5ce7b1ef3}"))
-		  trigger6 := oleutil.MustCallMethod(triggers, "Create", uint(6)).ToIDispatch()
+		//trigger6 := triggers.MustQueryInterface(ole.NewGUID("{d537d2b0-9fb3-4d34-9739-1ff5ce7b1ef3}"))
+		/*trigger6 := oleutil.MustCallMethod(triggers, "Create", uint(6)).ToIDispatch()
 		  defer trigger6.Release()
 		  oleutil.MustPutProperty(trigger6, "Id", "bing_wallpaper_idle_trigger")
 		  oleutil.MustPutProperty(trigger6, "Enabled", true)*/
 
-		// 创建注册触发器
+		// 创建/修改任务时触发器
 		//trigger7 := triggers.MustQueryInterface(ole.NewGUID("{4c8fec3a-c218-4e0c-b23d-629024db91a2}"))
-		trigger7 := oleutil.MustCallMethod(triggers, "Create", uint(7)).ToIDispatch()
-		defer trigger7.Release()
-		oleutil.MustPutProperty(trigger7, "Id", "bing_wallpaper_registration_trigger")
-		oleutil.MustPutProperty(trigger7, "Enabled", true)
+		/*trigger7 := oleutil.MustCallMethod(triggers, "Create", uint(7)).ToIDispatch()
+		  defer trigger7.Release()
+		  oleutil.MustPutProperty(trigger7, "Id", "bing_wallpaper_registration_trigger")
+		  oleutil.MustPutProperty(trigger7, "Enabled", true)*/
 
 		// 创建启动触发器
 		//trigger8 := triggers.MustQueryInterface(ole.NewGUID("{2a9c35da-d357-41f4-bbc1-207ac1b1f3cb}"))
@@ -557,7 +566,7 @@ func createSchedule() {
 		oleutil.MustPutProperty(action, "WorkingDirectory", "")
 		oleutil.MustPutProperty(action, "Arguments", "")
 
-		//
+		// 设置任务的主体
 		//oleutil.MustPutProperty(principal, "DisplayName", "")
 		//oleutil.MustPutProperty(principal, "GroupId", "")
 		//oleutil.MustPutProperty(principal, "Id", "")
@@ -565,7 +574,7 @@ func createSchedule() {
 		oleutil.MustPutProperty(principal, "RunLevel", uint(1))
 		//oleutil.MustPutProperty(principal, "UserId", "")
 
-		//
+		// 设置任务的设置
 		oleutil.MustPutProperty(settings, "Enabled", true)
 		oleutil.MustPutProperty(settings, "Hidden", true)
 		oleutil.MustPutProperty(settings, "RunOnlyIfIdle", false)
