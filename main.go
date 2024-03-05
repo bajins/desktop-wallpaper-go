@@ -9,15 +9,20 @@ import (
 	"golang.org/x/sys/windows/registry"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"runtime/debug"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -54,7 +59,7 @@ func main() {
 	debug.SetGCPercent(-1)
 
 	// 获取壁纸文件
-	image, err := DownloadBingImage()
+	image, err := DownloadImage()
 	if err != nil {
 		return
 	}
@@ -178,16 +183,12 @@ func DownloadFile(url, fileName string) error {
 	return nil
 }
 
-// DownloadBingImage 下载必应壁纸
-func DownloadBingImage() (string, error) {
-	// https://assets.msn.cn/resolver/api/resolve/v3/config/?expType=AppConfig&expInstance=default&apptype=edgeChromium&v=20240202.634
-	// BackgroundImageWC/default.properties.cmsImage
-
+func getBingImageUrl() (string, string, error) {
 	// 获取壁纸图片地址
-	const bingAPI = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1"
-	resp, err := http.Get(bingAPI)
+	const apiUrl = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1"
+	resp, err := http.Get(apiUrl)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -197,13 +198,13 @@ func DownloadBingImage() (string, error) {
 	}(resp.Body)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	// 提取图片地址
 	imageUrl := "https://www.bing.com" + gjson.GetBytes(body, "images.0.url").String()
 	u, err := url.Parse(imageUrl) // 解析URL
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	q := u.Query() // 获取查询参数
 	id := q.Get("id")
@@ -211,6 +212,99 @@ func DownloadBingImage() (string, error) {
 	rf := q.Get("rf")
 	fmt.Println(rf)
 
+	return imageUrl, rf, nil
+}
+
+func getSpotlightImageUrl() (string, string, error) {
+	const apiUrl = "https://arc.msn.com/v3/Delivery/Placement?pid=209567&fmt=json&cdm=1&pl=zh-CN&lc=zh-CN&ctry=CN"
+	resp, err := http.Get(apiUrl)
+	if err != nil {
+		return "", "", err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", err
+	}
+	// 提取图片地址
+	item := gjson.Parse(gjson.GetBytes(body, "batchrsp.items.0.item").Str)
+	imageUrl := item.Get("ad.image_fullscreen_001_landscape.u").String()
+
+	fmt.Println(item.Get("ad.hs1_title_text.tx"))
+
+	return imageUrl, "", nil
+}
+
+func getEdgeChromiumImageUrl() (string, string, error) {
+	const apiUrl = "https://assets.msn.cn/resolver/api/resolve/v3/config/?expType=AppConfig&expInstance=default&apptype=edgeChromium&v=20240202.634"
+	resp, err := http.Get(apiUrl)
+	if err != nil {
+		return "", "", err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", err
+	}
+	// 提取图片地址
+	bodyJson := gjson.ParseBytes(body)
+	datas := bodyJson.Get("configs.BackgroundImageWC/default.properties.cmsImage.data").Array()
+	// 随机取一个
+	rand.New(rand.NewSource(time.Now().UnixNano()))
+	num := rand.Intn(len(datas))
+	dataMap := datas[num].Get("image").Map()
+	// 将 map 的键复制到一个切片中
+	keys := reflect.ValueOf(dataMap).MapKeys()
+	// 按分辨率倒序排序
+	sort.Slice(keys, func(i, j int) bool {
+		ik, err := strconv.ParseInt(keys[i].String()[1:], 10, 0)
+		if err != nil {
+			panic(err)
+		}
+		jk, err := strconv.ParseInt(keys[j].String()[1:], 10, 0)
+		if err != nil {
+			panic(err)
+		}
+		return ik > jk
+	})
+	// 获取图片地址
+	imageUrl := bodyJson.Get("configs.StickyPeek/default.properties.stickyPeekLightCoachmarkMainImageURL").Str
+	// 替换图片地址
+	imageUrl = imageUrl[0:strings.LastIndex(imageUrl, "/")+1] + dataMap[keys[0].String()].Str
+
+	fmt.Println(dataMap)
+	fmt.Println(imageUrl)
+	return imageUrl, "", nil
+}
+
+// DownloadImage 下载壁纸
+func DownloadImage() (string, error) {
+	var imageUrl, fileName string
+	var err error
+	// 设置随机种子
+	rand.New(rand.NewSource(time.Now().UnixNano()))
+	num := rand.Intn(3)
+	fmt.Println(num)
+	if num == 1 {
+		imageUrl, fileName, err = getBingImageUrl()
+	} else if num == 2 {
+		imageUrl, fileName, err = getEdgeChromiumImageUrl()
+	} else {
+		imageUrl, fileName, err = getSpotlightImageUrl()
+	}
+	if err != nil {
+		return "", err
+	}
 	response, e := http.Get(imageUrl)
 	if e != nil {
 		return "", e
@@ -222,7 +316,7 @@ func DownloadBingImage() (string, error) {
 		}
 	}(response.Body)
 	// 获取图片格式
-	ext := filepath.Ext(rf)
+	ext := filepath.Ext(fileName)
 	if ext == "" {
 		ext = "jpg"
 	}
@@ -257,7 +351,7 @@ func DownloadBingImage() (string, error) {
 // 设置壁纸
 func setWallpaper(filePath string) error {
 	// 获取系统参数信息函数
-	syscallSPI_SETDESKWALLPAPER := syscall.MustLoadDLL("user32.dll").MustFindProc("SystemParametersInfoW")
+	systemParametersInfoW := syscall.MustLoadDLL("user32.dll").MustFindProc("SystemParametersInfoW")
 
 	// 转换文件路径为UTF16编码的指针
 	filePathUTF16Ptr, err := syscall.UTF16PtrFromString(filePath)
@@ -265,7 +359,7 @@ func setWallpaper(filePath string) error {
 		return err
 	}
 	// 调用SystemParametersInfoW函数来设置壁纸
-	ret, _, err := syscallSPI_SETDESKWALLPAPER.Call(
+	ret, _, err := systemParametersInfoW.Call(
 		uintptr(SPI_SETDESKWALLPAPER),
 		0,
 		uintptr(unsafe.Pointer(filePathUTF16Ptr)),
