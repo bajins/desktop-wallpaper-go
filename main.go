@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 	"github.com/tidwall/gjson"
@@ -241,8 +242,46 @@ func getSpotlightImageUrl() (string, string, error) {
 }
 
 func getEdgeChromiumImageUrl() (string, string, error) {
-	const apiUrl = "https://assets.msn.cn/resolver/api/resolve/v3/config/?expType=AppConfig&expInstance=default&apptype=edgeChromium&v=20240202.634"
-	resp, err := http.Get(apiUrl)
+	apiUrl := "https://ntp.msn.com/edge/ntp?locale=zh-cn"
+	// 创建一个新的HTTP请求
+	req, err := http.NewRequest("GET", apiUrl, nil)
+	if err != nil {
+		// 处理错误
+		return "", "", err
+	}
+	// 设置自定义的HTTP Header
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0")
+	// 创建客户端
+	client := &http.Client{}
+	// 发送请求并获取响应
+	resp, err := client.Do(req)
+	if err != nil {
+		// 处理错误
+		return "", "", err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}(resp.Body)
+	// 解析响应
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return "", "", err
+	}
+	dcs, bol := doc.Find("head").Attr("data-client-settings")
+	if !bol {
+		return "", "", err
+	}
+	bodyJson := gjson.ParseBytes([]byte(dcs))
+	version := bodyJson.Get("bundleInfo.v").String()
+
+	// 获取壁纸图片地址
+	// assets、assets2
+	apiUrl = "https://assets.msn.cn/resolver/api/resolve/v3/config/" +
+		"?expType=AppConfig&expInstance=default&apptype=edgeChromium&v=" + version
+	resp, err = http.Get(apiUrl)
 	if err != nil {
 		return "", "", err
 	}
@@ -257,8 +296,9 @@ func getEdgeChromiumImageUrl() (string, string, error) {
 		return "", "", err
 	}
 	// 提取图片地址
-	bodyJson := gjson.ParseBytes(body)
+	bodyJson = gjson.ParseBytes(body)
 	datas := bodyJson.Get("configs.BackgroundImageWC/default.properties.cmsImage.data").Array()
+	fmt.Println(datas)
 	// 随机取一个
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 	num := rand.Intn(len(datas))
